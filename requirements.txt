@@ -20,3 +20,17 @@ toolz==1.0.0
 tornado==6.4.2
 tqdm==4.67.1
 matplotlib==3.10.3
+certifi==2025.6.15
+charset-normalizer==3.4.2
+dateparser==1.2.1
+idna==3.10
+pip==24.2
+python-dateutil==2.9.0.post0
+pytz==2025.2
+regex==2024.11.6
+requests==2.32.4
+six==1.17.0
+tzdata==2025.2
+tzlocal==5.3.1
+urllib3==2.5.0
+youtube-comment-downloader==0.1.76
