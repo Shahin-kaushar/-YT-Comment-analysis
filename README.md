@@ -27,4 +27,7 @@ This project is a **YouTube Comment Sentiment Analyzer** built using **Natural L
 
 ---
 
+![Streamlit Output](https://github.com/Shahin-kaushar/-YT-Comment-analysis/blob/main/output%20Images/output_pic-2.png)
+![Comments Data Visualisation](https://github.com/Shahin-kaushar/-YT-Comment-analysis/blob/main/output%20Images/output_pic-3.png)
+
 
