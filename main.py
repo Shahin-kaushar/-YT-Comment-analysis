@@ -63,12 +63,6 @@ def sentiment_analysis(df1):
 
 def sentiment_pie_plot(df,positive,negative,neutral):
     plt.figure(figsize=(5,6))
-    #plt.title("    Youtube comments Sentiments analysis   ",)
-    #labels=["Positive_comments","Negative_comments","Neutral_comments"]
-    #exp=[0,0.2,0]
-    #color=["#00b300","#2e2eb8","#ff6600"]
-    #plt.pie([positive,negative,neutral],colors=color,labels=labels,explode=exp,autopct="%1.2f%%,",pctdistance=0.6,shadow=True,labeldistance=1.1)
-    #plt.legend(loc="upper left", bbox_to_anchor=(-0.5,0))
     return plt.show()
 
 
