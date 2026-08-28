@@ -92,9 +92,9 @@ def main():
         st.dataframe(df2,use_container_width=True)
 
         # extracting the columns for pie chart depiction
-        positive=df2.loc[df2["Sentiment"]=="Positive"].count()[0]
-        negative=df2.loc[df2["Sentiment"]=="Negative"].count()[0]
-        neutral=df2.loc[df2["Sentiment"]=="Neutral"].count()[0]
+        positive = (df2["Sentiment"] == "Positive").sum()
+        negative = (df2["Sentiment"] == "Negative").sum()
+        neutral = (df2["Sentiment"] == "Neutral").sum()
 
         #pie plot
         exp=[0,0.2,0]
