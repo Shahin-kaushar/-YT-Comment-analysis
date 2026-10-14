@@ -80,12 +80,7 @@ def main():
         df=comment_download(video_link)  #df is the dataframe of the comments
 
         # Dropping of the unnecessary columns
-        
-df1 = df.drop(
-    columns=["cid", "time", "author", "channel", "votes",
-             "replies", "photo", "heart", "reply", "time_parsed"],
-    errors="ignore"
-)
+        df1 = df.drop(columns=["cid", "time", "author", "channel", "votes","replies", "photo", "heart", "reply", "time_parsed"],errors="ignore")
 
         
         # renaming the column from text to comments
