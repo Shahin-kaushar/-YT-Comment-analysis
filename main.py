@@ -81,9 +81,8 @@ def main():
 
         # Dropping of the unnecessary columns
         df1 = df.drop(columns=["cid", "time", "author", "channel", "votes","replies", "photo", "heart", "reply", "time_parsed"],errors="ignore")
-
         
-        # renaming the column from text to comments
+        # renaming the column from text to comment
         df1.rename(columns={'text':"Comment"},inplace=True)
 
         # performing sentiment analysis
