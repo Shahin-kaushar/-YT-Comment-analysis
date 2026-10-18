@@ -1,126 +1,320 @@
-#from pytube import youtube
 
-from youtube_comment_downloader import *
-downloader = YoutubeCommentDownloader()
-import json
-from youtube_comments_scraper import *
-#Libraries
-import numpy as np
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import streamlit as st
-import time as t
-import os
-
-# Import functions for data preprocessing & data preparation
-from sklearn.preprocessing import LabelEncoder
-from sklearn.utils import resample
-from sklearn.feature_extraction.text import CountVectorizer
 import nltk
-nltk.download('vader_lexicon')
+
+from youtube_comment_downloader import YoutubeCommentDownloader
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
-sentiments = SentimentIntensityAnalyzer()
-from sklearn import metrics
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
-from nltk.stem import PorterStemmer, LancasterStemmer
-from nltk.stem.snowball import SnowballStemmer
-from nltk.corpus import stopwords
-from nltk.corpus import wordnet
-import string
-from string import punctuation
-import re
+
+
+# --------------------------------------------------
+# PAGE CONFIGURATION
+# --------------------------------------------------
+
+st.set_page_config(
+    page_title="YouTube Comment Sentiment Analysis",
+    page_icon="📊",
+    layout="wide"
+)
+
+st.title("📊 YouTube Comment Sentiment Analysis")
+st.write(
+    "Analyze YouTube comments and visualize their sentiment "
+    "as Positive, Negative, or Neutral."
+)
+
+
+# --------------------------------------------------
+# INITIALIZE MODELS
+# --------------------------------------------------
+
+@st.cache_resource
+def load_sentiment_analyzer():
+    try:
+        return SentimentIntensityAnalyzer()
+    except LookupError:
+        nltk.download("vader_lexicon", quiet=True)
+        return SentimentIntensityAnalyzer()
+
+
+sentiments = load_sentiment_analyzer()
+downloader = YoutubeCommentDownloader()
+
+
+# --------------------------------------------------
+# DOWNLOAD COMMENTS
+# --------------------------------------------------
 
 def comment_download(video_link):
     comments = downloader.get_comments_from_url(video_link)
+    comments_list = list(comments)
 
-     # Split the comments string into lines
-    comments_lines = list(comments)
+    if not comments_list:
+        return pd.DataFrame(columns=["Comment"])
 
-    # Convert the  comments lines into a DataFrame 
-    df = pd.DataFrame(comments_lines)
+    df = pd.DataFrame(comments_list)
+
+    if "text" in df.columns:
+        df.rename(columns={"text": "Comment"}, inplace=True)
+
+    if "Comment" not in df.columns:
+        raise ValueError(
+            "The downloader did not return a comment text column."
+        )
+
+    df["Comment"] = df["Comment"].fillna("").astype(str)
+    df = df[df["Comment"].str.strip() != ""].copy()
 
     return df
 
+
+# --------------------------------------------------
+# SENTIMENT ANALYSIS
+# --------------------------------------------------
+
 def sentiment_analysis(df1):
-   
-   df1["Positive"] = [sentiments.polarity_scores(i)["pos"] for i in df1["Comment"]]
-   df1["Negative"] = [sentiments.polarity_scores(i)["neg"] for i in df1["Comment"]]
-   df1["Neutral"] = [sentiments.polarity_scores(i)["neu"] for i in df1["Comment"]]
-   df1['Compound'] = [sentiments.polarity_scores(i)["compound"] for i in df1["Comment"]]
-   score = df1["Compound"].values
-   sentiment = []
-   for i in score:
-    if i >= 0.05 :
-        sentiment.append('Positive')
-    elif i <= -0.05 :
-        sentiment.append('Negative')
-    else:
-        sentiment.append('Neutral')
-        
-   df1["Sentiment"] = sentiment
-   return df1
+    df1 = df1.copy()
 
-def sentiment_pie_plot(df,positive,negative,neutral):
-    plt.figure(figsize=(5,6))
-    return plt.show()
+    scores = df1["Comment"].apply(sentiments.polarity_scores)
 
+    df1["Positive"] = scores.apply(lambda x: x["pos"])
+    df1["Negative"] = scores.apply(lambda x: x["neg"])
+    df1["Neutral"] = scores.apply(lambda x: x["neu"])
+    df1["Compound"] = scores.apply(lambda x: x["compound"])
+
+    def classify_sentiment(score):
+        if score >= 0.05:
+            return "Positive"
+        elif score <= -0.05:
+            return "Negative"
+        return "Neutral"
+
+    df1["Sentiment"] = df1["Compound"].apply(classify_sentiment)
+
+    return df1
+
+
+# --------------------------------------------------
+# DONUT CHART
+# --------------------------------------------------
+
+def sentiment_donut_chart(positive, negative, neutral):
+    counts = {
+        "Positive": positive,
+        "Negative": negative,
+        "Neutral": neutral,
+    }
+
+    chart_counts = {
+        label: count
+        for label, count in counts.items()
+        if count > 0
+    }
+
+    total = sum(counts.values())
+
+    if total == 0:
+        st.info("No comments are available to display.")
+        return
+
+    color_map = {
+        "Positive": "#00b300",
+        "Negative": "#2e2eb8",
+        "Neutral": "#ff6600",
+    }
+
+    labels = list(chart_counts.keys())
+    values = list(chart_counts.values())
+    colors = [color_map[label] for label in labels]
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    wedges, _, autotexts = ax.pie(
+        values,
+        colors=colors,
+        labels=None,
+        autopct=lambda pct: f"{pct:.1f}%",
+        startangle=90,
+        counterclock=False,
+        pctdistance=0.78,
+        wedgeprops={
+            "width": 0.38,
+            "edgecolor": "white",
+            "linewidth": 2,
+        },
+    )
+
+    for autotext in autotexts:
+        autotext.set_fontsize(11)
+        autotext.set_fontweight("bold")
+
+    ax.text(
+        0, 0.08, f"{total:,}",
+        ha="center", va="center",
+        fontsize=25, fontweight="bold",
+    )
+
+    ax.text(
+        0, -0.15, "Comments",
+        ha="center", va="center",
+        fontsize=11,
+    )
+
+    legend_labels = [
+        f"{label}: {count:,} ({count / total:.1%})"
+        for label, count in chart_counts.items()
+    ]
+
+    ax.legend(
+        wedges,
+        legend_labels,
+        title="Sentiment",
+        loc="center left",
+        bbox_to_anchor=(1, 0.5),
+        frameon=False,
+    )
+
+    ax.set_title("Sentiment Distribution of All Analyzed Comments")
+    ax.axis("equal")
+
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+# --------------------------------------------------
+# MAIN STREAMLIT APPLICATION
+# --------------------------------------------------
 
 def main():
+    video_link = st.text_input(
+        "YouTube Video URL",
+        placeholder="Paste a YouTube video link here",
+    )
 
-    st.title("YouTube comment sentiment analysis")
+    analyze_button = st.button(
+        "Analyze Comments",
+        type="primary",
+        use_container_width=True,
+    )
 
-    # video URL
-    st.write("Drop the youtube video link")
-    video_link=st.text_input(" YouTube  video URL")
+    if analyze_button:
+        if not video_link.strip():
+            st.warning("Please enter a YouTube video URL.")
+            st.stop()
 
-      # Check if the input is a valid URL and handle accordingly
-    if video_link:
-        st.write(f"URL entered: {video_link}")
-        df=comment_download(video_link)  #df is the dataframe of the comments
+        try:
+            # Download comments directly
+            with st.spinner(
+                "Downloading comments. This may take some time..."
+            ):
+                df = comment_download(video_link.strip())
 
-        # Dropping of the unnecessary columns
-        df1 = df.drop(columns=["cid", "time", "author", "channel", "votes","replies", "photo", "heart", "reply", "time_parsed"],errors="ignore")
-        
-        # renaming the column from text to comment
-        df1.rename(columns={'text':"Comment"},inplace=True)
+            if df.empty:
+                st.warning(
+                    "No comments were retrieved. The video may have "
+                    "disabled comments, or YouTube may be blocking "
+                    "automated requests."
+                )
+                st.stop()
 
-        # performing sentiment analysis
-        df2=sentiment_analysis(df1)
+            # Remove unnecessary metadata columns
+            columns_to_drop = [
+                "cid", "time", "author", "channel", "votes",
+                "replies", "photo", "heart", "reply", "time_parsed"
+            ]
 
-        #df2 is the final dataframe 
-        st.dataframe(df2,use_container_width=True)
+            df.drop(
+                columns=columns_to_drop,
+                errors="ignore",
+                inplace=True,
+            )
 
-        # extracting the columns for pie chart depiction
-        positive = (df2["Sentiment"] == "Positive").sum()
-        negative = (df2["Sentiment"] == "Negative").sum()
-        neutral = (df2["Sentiment"] == "Neutral").sum()
+            st.success(f"Downloaded {len(df):,} comments.")
 
-        #pie plot
-        exp=[0,0.2,0]
-        labels=["Positive_comments","Negative_comments","Neutral_comments"]
-        color=["#00b300","#2e2eb8","#ff6600"]
-        fig=sentiment_pie_plot(df2,positive,negative,neutral)
-        fig, ax = plt.subplots()
-        ax.set_title("    Youtube comments Sentiments analysis   ")
-        ax.pie([positive,negative,neutral],colors=color,labels=labels,explode=exp,autopct="%1.2f%%,",pctdistance=0.6,shadow=True,labeldistance=1.1)
-        ax.axis('equal')
-        ax.legend(loc="upper left", bbox_to_anchor=(-0.5,0))
-        st.pyplot(fig,clear_figure=True,dpi=150,use_container_width=True)
+            # Analyze every retrieved comment
+            with st.spinner("Analyzing comment sentiment..."):
+                df2 = sentiment_analysis(df)
 
+            st.success(
+                f"Sentiment analysis completed for {len(df2):,} comments."
+            )
+
+            # Calculate sentiment counts
+            positive = int((df2["Sentiment"] == "Positive").sum())
+            negative = int((df2["Sentiment"] == "Negative").sum())
+            neutral = int((df2["Sentiment"] == "Neutral").sum())
+            total = len(df2)
+
+            # Summary metrics
+            st.subheader("📈 Sentiment Summary")
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            col1.metric("Total Comments", f"{total:,}")
+            col2.metric(
+                "Positive",
+                f"{positive:,}",
+                f"{positive / total:.1%}" if total else "0%",
+            )
+            col3.metric(
+                "Negative",
+                f"{negative:,}",
+                f"{negative / total:.1%}" if total else "0%",
+            )
+            col4.metric(
+                "Neutral",
+                f"{neutral:,}",
+                f"{neutral / total:.1%}" if total else "0%",
+            )
+
+            st.divider()
+
+            # Donut chart
+            sentiment_donut_chart(positive, negative, neutral)
+
+            st.divider()
+
+            # Analyzed comments
+            st.subheader("💬 Analyzed Comments")
+
+            selected_sentiment = st.selectbox(
+                "Filter comments by sentiment",
+                ["All", "Positive", "Negative", "Neutral"],
+            )
+
+            if selected_sentiment == "All":
+                display_df = df2
+            else:
+                display_df = df2[
+                    df2["Sentiment"] == selected_sentiment
+                ]
+
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # Download results
+            st.download_button(
+                "⬇️ Download All Analyzed Comments (CSV)",
+                data=df2.to_csv(index=False).encode("utf-8-sig"),
+                file_name="youtube_sentiment_analysis.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+        except Exception as exc:
+            st.error(f"Unable to analyze this video: {exc}")
+            st.caption(
+                "Check the video URL and internet connection. "
+                "YouTube may block automated comment downloading."
+            )
 
     else:
-        st.write("Please enter a valid YouTube URL to proceed.")
-    
+        st.info("Enter a YouTube URL and click Analyze Comments.")
 
-   
-# main function
+
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
