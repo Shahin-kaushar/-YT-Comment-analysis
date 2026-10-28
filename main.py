@@ -195,7 +195,7 @@ def main():
     analyze_button = st.button(
         "Analyze Comments",
         type="primary",
-        use_container_width=True,
+        width='stretch',
     )
 
     if analyze_button:
